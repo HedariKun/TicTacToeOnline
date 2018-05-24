@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>TicTacToe online</title>
+        <style>
+            *{
+                padding: 0;
+                margin: 0;
+            }
+            body {
+                background-color: #f3f3f3;
+            }
+            .container{
+                width: 80%;
+                margin: auto;
+            }
+            #header{
+                background-color: #232323;
+                margin-top: 5px;
+                height: 5%;
+                text-align: center;
+                color: white;
+                padding-top: 30px;
+                padding-bottom: 30px;
+                font-size: 40px;
+            }
+            #body{
+                background-color: #cccccc;
+                height: 450px;
+                position: relative;
+            }
+            
+            #footer{
+                background-color: #232323;
+                text-align: center;
+                font-size: 20px;
+                height: 5%;
+                padding-top: 30px;
+                padding-bottom: 30px;
+                color: white;
+            }
+
+            .button{
+                width: 20%;
+                padding: 10px 60px 10px 30px;
+                border-radius: 8px;
+                background-color: #343434;
+                color: #cccccc;
+                }
+            .button:hover {
+                color: white;
+                background-color: #565656;
+                cursor: pointer;    
+            }
+            .button:active{
+                background-color: #454545;
+            }
+            
+            .buttonBox{
+                position: absolute;
+                left: 45%;
+                top: 45%;
+            }
+
+            .gridBox{
+                position: absolute;
+                width: 90%;
+                height: 90%;
+                left: 5%;
+                top: 5%;
+            }
+
+            .grid{
+                width: 33.3%;
+                height: 33.3%;
+                text-align: center;
+                padding-top: 1%;
+                font-size: 80px;
+                box-sizing: border-box;
+                float: left;
+                border: 1px solid black;
+            }
+
+            .grid:hover{
+                background-color: #aaaaaa;
+                cursor: pointer;
+            }
+            .clr {
+                clear: both;
+            }
+        </style>
+        <script src="/socket.io/socket.io.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <div id="header"><p>TicTacToe Online</p></div>
+            <div id="body">
+                <div id="joinContainer">
+                    <div class="buttonBox">
+                        <div class="button" onclick="getRoom()" id="GameJoin">JoinGame</div>
+                    </div>
+                </div>
+                <div id="gridContainer">
+                    <div class="gridBox">
+                        <div onclick="play(0)" class="grid">x</div>
+                        <div onclick="play(1)" class="grid">x</div>
+                        <div onclick="play(2)" class="grid">x</div>
+                        <div onclick="play(3)" class="grid">x</div>
+                        <div onclick="play(4)" class="grid">x</div>
+                        <div onclick="play(5)" class="grid">x</div>
+                        <div onclick="play(6)" class="grid">x</div>
+                        <div onclick="play(7)" class="grid">x</div>
+                        <div onclick="play(8)" class="grid">x</div>
+                        <div class="clr"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="footer">&copy; All right recived HedariKun 2018</div>
+        </div>
+        <script>
+             let socket = io();
+            let room = {id:0, grid:[], turn:0, type:0, ingame:false, isWinner:false};
+            let timer = 0;
+            let winningTimer = 0;
+            const JG = document.getElementById("GameJoin");
+            const JGI = document.getElementById("joinContainer").innerHTML;
+            const GridLayout = document.getElementById("gridContainer").innerHTML;
+
+            window.onload = () =>{
+                document.getElementById("body").innerHTML = JGI;
+            }
+            
+            function getRoom(){
+                if(timer < 0){
+                socket.emit("JoinRoom");
+                    timer = 1;
+                }  
+            }
+
+            function play(pos){
+                if(room.turn == room.type)
+                socket.emit("played", {id:room.id, pos:pos, turn:room.turn});
+            }
+
+            function deleteRoom(){
+                    room.id = 0;
+                    room.ingame = false;
+                    room.turn = 0;
+                    room.grid = [];
+                    room.isWinner = false;
+            }
+
+            setInterval(()=>{
+                timer--;
+                winningTimer--;
+                socket.on("room-info", m =>{
+                    room.id = m.id;
+                    room.ingame = m.inGame;
+                    room.turn = m.turn;
+                    room.grid = m.grid;
+                    room.type = m.type;
+                });
+                socket.on("updatedInfo", m=> {
+                    room.id = m.id;
+                    room.type = m.type;
+                    room.ingame = m.inGame;
+                    room.turn = m.turn;
+                    room.grid = m.grid;
+                });
+                if(winningTimer <= 0 && room.isWinner){
+                    deleteRoom();
+                }
+                socket.on("deleted", ()=>{
+                    deleteRoom();
+                });
+
+                if(room.id == 0){
+                    document.getElementById("body").innerHTML = JGI;
+                    document.getElementById("header").innerHTML = "<p>TicTacToe Online</p>";
+                }
+
+                if(room.id > 0 && !room.ingame){
+                    document.getElementById("body").innerHTML = "waiting for opponent";
+                }
+                if(room.ingame){
+                    if(!room.isWinner){
+                        document.getElementById("body").innerHTML = GridLayout;
+                        let g = document.getElementsByClassName("grid");
+                        if(room.turn == room.type){
+                            document.getElementById("header").innerHTML = "<p>Your Turn</p>";
+                        } else {
+                            document.getElementById("header").innerHTML = "<p>Oppenont Turn</p>";
+                        }
+                        for(let i = 0; i < g.length; i++){
+                            g[i].innerHTML = room.grid[i];
+                        }
+                    }
+            }
+
+                socket.on("finished", m =>{
+                    if(winningTimer <= 0)
+                        winningTimer = 5;
+                    if((m.c == "o" && room.type == 1) || (m.c == "x" && room.type == 0)){
+                        document.getElementById("header").innerHTML = "<p>you won</p>";
+                    } else if (m.c == "draw"){
+                        document.getElementById("header").innerHTML = "<p>it is draw</p>";
+                    }
+                    else {
+                        document.getElementById("header").innerHTML = "<p>you lost</p>";
+                    }
+                    let g = document.getElementsByClassName("grid");
+                    for(let i = 0; i < g.length; i++){
+                            g[i].innerHTML = m.grid[i];
+                    }
+                    room.isWinner = true;
+                });
+                
+            }, 1000);
+            
+        </script>
+
+    </body>
+</html>
